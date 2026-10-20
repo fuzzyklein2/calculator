@@ -40,6 +40,8 @@ use std::io::{ // Needed for `flush` (?)
 
 use std::path::{ Path, PathBuf };
 
+use std::process::{ Command, Stdio };
+
 use std::sync::{ OnceLock };
 
 // Command line parsing crate
@@ -74,12 +76,21 @@ use hw::constants::{
 
 use hw::files::home;
 
+// Constant chars
+const PERIOD_CHAR: char = '.';
 // Constant strings
 const GREETING: &str = "Hello, "; // Format string
 const NAME: &str = "🌎 "; // Default name
-// const DATA_DIR_NAME: &str = "data"; // Name of the app's user data folder.
+const DATA_DIR_NAME: &str = "data"; // Name of the app's user data folder.
+
+// REPL command strings
+const HELP: &str = "help";
 const QUIT: &str = "quit";
 
+enum Commands {
+    HELP,
+    QUIT,
+}
 
 // Global variable
 pub static arguments: OnceLock<Args> = OnceLock::new();
@@ -133,6 +144,11 @@ pub struct QuitParser {
 enum QuitResult {
     Ok(),
     Error(String),
+}
+
+#[derive(Debug, Parser)]
+pub struct HelpParser {
+    pub cmd: String,
 }
 
 /******************************************************************************
@@ -256,6 +272,11 @@ fn read_number(prompt: &str) -> f64 {
     }
 }
 
+/// TODO: Put something a little more helpful in here.
+fn help (args: &Vec<String>) {
+    println!("God helps those who help themselves!");
+}
+
 /******************************************************************************
 *
 *   main()
@@ -268,6 +289,9 @@ fn main() -> () {
     let PROGRAM_PATH = current_exe().expect("`current_exe` failed");
     let BINARY_EXE_NAME = PROGRAM_PATH.file_stem().unwrap().to_string_lossy().into_owned().to_string();
     println!("Running {}", BINARY_EXE_NAME);
+
+    let mut USER_DATA_DIR = home();
+
     let args = Args::parse();       // Parse command line arguments and
     arguments.set(args).unwrap();   // store them in `arguments`.
 
@@ -285,6 +309,9 @@ fn main() -> () {
     warn!("Danger, Will Robinson!");
     error!("I've got a bad feeling about this.");
     trace!("Screw you guys! I'm going home!");
+
+    // Comment this line out to continue
+    // return ();
 
     // Add more code here...
 
@@ -305,19 +332,54 @@ fn main() -> () {
                     .expect("Error saving input line to history file!");
                 let words = split(&line.to_string()).unwrap();
                 let cmd = &words[0];
+                let nargs = words.len();
                 // Parse a vector of strings
                 match cmd.as_str() {
+                    /// Exit the program normally
                     QUIT => {
+                        // TODO: Implement a confirmation dialog here.
+
+                        let request = r#"{
+                            "dialog" : "question",
+                            "title"  : "Quit",
+                            "text"   : "Do you really want to quit?"
+                        }"#;
+
+                        let mut child = Command::new("dialogs")
+                            .stdin(Stdio::piped())
+                            .stdout(Stdio::piped())
+                            .spawn()
+                            .expect("Failed to create `Command`!");
+
+                        child.stdin.take()
+                                   .unwrap()
+                                   .write_all(request.as_bytes())
+                                   .expect("Write bytes to `stdin` failed!");
+
+                        let mut response = String::new();
+                        child.stdout.take()
+                                    .unwrap()
+                                    .read_to_string(&mut response)
+                                    .expect("");
+
+                        let status = child.wait().expect("Waiting returned an error!");
+
+                        println!("Response: {response}");
+
+
                         println!("Quitting {}", BINARY_EXE_NAME);
                         return;
+                    }
+                    HELP => {
+                        help(&words)
                     }
                     _ => {
                         error!("{}Unknown command! {}",
                               ERROR_PICT, SCRATCH_HEAD);
-                        continue;
+                        // continue;
                     }
                 }
-                println!("Line: {:?}", words);
+                // println!("Line: {:?}", words);
             },
             Err(ReadlineError::Interrupted) => {
                 println!("CTRL-C");
