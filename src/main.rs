@@ -452,8 +452,32 @@ fn main() -> () {
                             "text"   : "Do you really want to quit?"
                         }"#;
 
-                        let mut child = Command::new("py")
-                            .args(["-m", "dialogs"])
+                        let cmd;
+                        let mut module;
+
+                        let cmd_path;
+
+                        match std::env::consts::OS {
+                            "windows" => {
+                                cmd = "py";
+                                module = "dialogs";
+                            }
+                            "linux" => {
+                                cmd_path = format!(
+                                    "{}/projects/dialogs/.venv/bin/python",
+                                    home().unwrap().to_string_lossy()
+                                );
+                                cmd = cmd_path.as_str();
+                                module = "dialogs";
+                            }
+                            _ => {
+                                cmd = "";
+                                module = "";
+                            }
+                        }
+
+                        let mut child = Command::new(cmd)
+                            .args(["-m", module])
                             .stdin(Stdio::piped())
                             .stdout(Stdio::piped())
                             .spawn()
